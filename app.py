@@ -439,13 +439,84 @@ def main():
     
     # Main tabs
     tab1, tab2, tab3, tab4 = st.tabs([
+        "📊 Portfolio Analytics",
         "👨‍🌾 Farmer Dashboard", 
         "💼 Investor View", 
-        "📊 Portfolio Analytics",
         "🌍 Climate Impact"
     ])
     
     with tab1:
+        st.header("📊 Portfolio-Level Analytics")
+        st.markdown("### Aggregated Impact Across All Projects")
+        
+        # Portfolio metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        total_farms = len(farms_df)
+        total_area = farms_df['area_ha'].sum()
+        total_carbon = carbon_df['estimated_tCO2_yr'].sum()
+        total_revenue = carbon_df['annual_revenue_usd'].sum()
+        
+        col1.metric("Total Projects", total_farms, "Active farms")
+        col2.metric("Total Area", f"{total_area:.1f} ha", "Under management")
+        col3.metric("Carbon Potential", f"{total_carbon:.1f} tCO2e/yr", "Annual sequestration")
+        col4.metric("Revenue Potential", f"${total_revenue:.0f}/yr", "Carbon credits")
+        
+        # Portfolio map
+        st.subheader("🗺️ Geographic Distribution")
+        portfolio_map = folium.Map(location=[-1.2, 36.0], zoom_start=9)
+        
+        for _, farm_row in farms_df.iterrows():
+            carbon_val = carbon_df[carbon_df['farm_id'] == farm_row['farm_id']]['estimated_tCO2_yr'].values[0]
+            folium.CircleMarker(
+                location=[farm_row['lat'], farm_row['lng']],
+                radius=farm_row['area_ha'] * 3,
+                popup=f"<b>{farm_row['farm_name']}</b><br>{farm_row['practice']}<br>{carbon_val:.1f} tCO2e/yr",
+                color='green',
+                fill=True,
+                fillColor='lightgreen',
+                fillOpacity=0.6
+            ).add_to(portfolio_map)
+        
+        st_folium(portfolio_map, width=900, height=400)
+        
+        # Practice distribution
+        st.subheader("🌾 Climate-Smart Practices")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            practice_counts = farms_df['practice'].value_counts()
+            fig_practice = px.pie(values=practice_counts.values, names=practice_counts.index,
+                                 title="Distribution of Practices",
+                                 color_discrete_sequence=px.colors.sequential.Greens)
+            st.plotly_chart(fig_practice, use_container_width=True)
+        
+        with col2:
+            farmer_types = farms_df['farmer_type'].value_counts()
+            fig_types = px.bar(x=farmer_types.index, y=farmer_types.values,
+                              title="Farmer Types",
+                              labels={'x': 'Type', 'y': 'Count'},
+                              color=farmer_types.values,
+                              color_continuous_scale='Greens')
+            st.plotly_chart(fig_types, use_container_width=True)
+        
+        # Carbon comparison
+        st.subheader("💚 Carbon Sequestration by Project")
+        carbon_comparison = farms_df.merge(carbon_df[['farm_id', 'estimated_tCO2_yr', 'annual_revenue_usd']], 
+                                          on='farm_id')
+        
+        fig_carbon = px.bar(carbon_comparison, 
+                           x='farm_name', 
+                           y='estimated_tCO2_yr',
+                           title="Annual Carbon Sequestration Potential",
+                           labels={'estimated_tCO2_yr': 'tCO2e per year', 'farm_name': 'Farm'},
+                           color='estimated_tCO2_yr',
+                           color_continuous_scale='Greens')
+        fig_carbon.update_layout(showlegend=False)
+        st.plotly_chart(fig_carbon, use_container_width=True)
+    
+    with tab2:
         st.header(f"{farm['farm_name']} - Operational Dashboard")
         
         col1, col2 = st.columns([2, 1])
@@ -461,15 +532,6 @@ def main():
             st_folium(m, width=700, height=350)
         
         with col2:
-            st.markdown("### Farm Details")
-            st.markdown(f"""
-            - **Type**: {farm['farmer_type']}
-            - **Practice**: {farm['practice']}
-            - **Area**: {farm['area_ha']} hectares
-            - **Crop**: {farm['crop_type']}
-            - **Intervention**: {farm['intervention_date'].strftime('%b %Y')}
-            """)
-            
             st.markdown("### Carbon Potential")
             st.metric("Annual Sequestration", f"{carbon['estimated_tCO2_yr']:.1f} tCO2e")
             st.metric("Potential Revenue", f"${carbon['annual_revenue_usd']:.0f}/year")
@@ -519,7 +581,7 @@ def main():
             st.info(f"**Date**: {validation['submission_date'].strftime('%B %d, %Y')}")
             st.caption(f"_{validation['notes']}_")
     
-    with tab2:
+    with tab3:
         st.header("💼 Investor Impact Report")
         
         # Calculate metrics
@@ -592,77 +654,6 @@ def main():
                 mime="application/pdf"
             )
             st.success("✅ Report generated successfully!")
-    
-    with tab3:
-        st.header("📊 Portfolio-Level Analytics")
-        st.markdown("### Aggregated Impact Across All Projects")
-        
-        # Portfolio metrics
-        col1, col2, col3, col4 = st.columns(4)
-        
-        total_farms = len(farms_df)
-        total_area = farms_df['area_ha'].sum()
-        total_carbon = carbon_df['estimated_tCO2_yr'].sum()
-        total_revenue = carbon_df['annual_revenue_usd'].sum()
-        
-        col1.metric("Total Projects", total_farms, "Active farms")
-        col2.metric("Total Area", f"{total_area:.1f} ha", "Under management")
-        col3.metric("Carbon Potential", f"{total_carbon:.1f} tCO2e/yr", "Annual sequestration")
-        col4.metric("Revenue Potential", f"${total_revenue:.0f}/yr", "Carbon credits")
-        
-        # Portfolio map
-        st.subheader("🗺️ Geographic Distribution")
-        portfolio_map = folium.Map(location=[-1.2, 36.0], zoom_start=9)
-        
-        for _, farm_row in farms_df.iterrows():
-            carbon_val = carbon_df[carbon_df['farm_id'] == farm_row['farm_id']]['estimated_tCO2_yr'].values[0]
-            folium.CircleMarker(
-                location=[farm_row['lat'], farm_row['lng']],
-                radius=farm_row['area_ha'] * 3,
-                popup=f"<b>{farm_row['farm_name']}</b><br>{farm_row['practice']}<br>{carbon_val:.1f} tCO2e/yr",
-                color='green',
-                fill=True,
-                fillColor='lightgreen',
-                fillOpacity=0.6
-            ).add_to(portfolio_map)
-        
-        st_folium(portfolio_map, width=900, height=400)
-        
-        # Practice distribution
-        st.subheader("🌾 Climate-Smart Practices")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            practice_counts = farms_df['practice'].value_counts()
-            fig_practice = px.pie(values=practice_counts.values, names=practice_counts.index,
-                                 title="Distribution of Practices",
-                                 color_discrete_sequence=px.colors.sequential.Greens)
-            st.plotly_chart(fig_practice, use_container_width=True)
-        
-        with col2:
-            farmer_types = farms_df['farmer_type'].value_counts()
-            fig_types = px.bar(x=farmer_types.index, y=farmer_types.values,
-                              title="Farmer Types",
-                              labels={'x': 'Type', 'y': 'Count'},
-                              color=farmer_types.values,
-                              color_continuous_scale='Greens')
-            st.plotly_chart(fig_types, use_container_width=True)
-        
-        # Carbon comparison
-        st.subheader("💚 Carbon Sequestration by Project")
-        carbon_comparison = farms_df.merge(carbon_df[['farm_id', 'estimated_tCO2_yr', 'annual_revenue_usd']], 
-                                          on='farm_id')
-        
-        fig_carbon = px.bar(carbon_comparison, 
-                           x='farm_name', 
-                           y='estimated_tCO2_yr',
-                           title="Annual Carbon Sequestration Potential",
-                           labels={'estimated_tCO2_yr': 'tCO2e per year', 'farm_name': 'Farm'},
-                           color='estimated_tCO2_yr',
-                           color_continuous_scale='Greens')
-        fig_carbon.update_layout(showlegend=False)
-        st.plotly_chart(fig_carbon, use_container_width=True)
     
     with tab4:
         st.header("🌍 Climate Impact Summary")
@@ -814,4 +805,4 @@ def main():
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()
+    main() 
