@@ -1,0 +1,7 @@
+streamlit
+folium
+streamlit-folium
+fpdf2
+pandas
+numpy
+plotly
